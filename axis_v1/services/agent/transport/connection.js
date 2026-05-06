@@ -24,14 +24,19 @@ export class AgentConnection {
     this.attempt     = 0
     this.connected   = false
     this.handlers    = {}        // message type → handler fn
+    this.lifecycleHandlers = {}  // 'connected', 'disconnected' → handler fn
     this._heartbeatTimer = null
   }
 
   /**
-   * Register a handler for incoming message types.
+   * Register a handler for incoming message types or lifecycle events.
    */
   on(type, handler) {
-    this.handlers[type] = handler
+    if (type === 'connected' || type === 'disconnected') {
+      this.lifecycleHandlers[type] = handler
+    } else {
+      this.handlers[type] = handler
+    }
     return this
   }
 
@@ -52,6 +57,9 @@ export class AgentConnection {
       this.attempt   = 0
       log.info('connected to coordinator')
       this._startHeartbeat()
+      if (this.lifecycleHandlers['connected']) {
+        this.lifecycleHandlers['connected']()
+      }
     })
 
     this.ws.on('message', (raw) => {
@@ -69,6 +77,9 @@ export class AgentConnection {
       this.connected = false
       this._stopHeartbeat()
       log.warn({ code, reason: reason.toString() }, 'disconnected from coordinator')
+      if (this.lifecycleHandlers['disconnected']) {
+        this.lifecycleHandlers['disconnected']()
+      }
       this._scheduleReconnect()
     })
 

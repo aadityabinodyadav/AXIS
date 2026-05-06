@@ -1,6 +1,7 @@
 import { getConfig } from "../../packages/config/src/index.js";
 import { createLogger } from "../../packages/logger/src/index.js";
 import { MessageType } from "../../packages/protocol/messages.js";
+import { execute } from "./executors/shell.js";
 import { getSnapShot } from "./observer/system.js";
 import { AgentConnection } from "./transport/connection.js";
 
@@ -23,11 +24,28 @@ conn.on(MessageType.PROBE, (msg)=>{
 })
 
 conn.on(MessageType.COMMAND,(msg)=>{
-  log.info({ commandId: msg.id, action: msg.payload.action }, 'command received')
-  conn.send(MessageType.COMMAND_ACK,{
-    commandId: msg.id,
-    status: 'acked'
-  })
+    const { commandId = msg.id, action, params = {} } = msg.payload || {}
+
+    log.info({ commandId, action }, 'command received')
+    conn.send(MessageType.COMMAND_ACK,{
+        commandId,
+        status: 'acked'
+    })
+
+    const result = execute(action, params)
+
+    conn.send(MessageType.RESPONSE, {
+            commandId,
+            status: result.ok ? 'success' : 'failed',
+            output: result.output,
+            error: result.error
+    })
+})
+
+conn.on('connected', () => {
+    const snapshot = getSnapShot()
+    conn.send(MessageType.SYSTEM_STATE, snapshot)
+    log.info('initial system state sent')
 })
 
 setInterval(()=>{

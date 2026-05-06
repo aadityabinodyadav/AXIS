@@ -19,8 +19,9 @@ export function getSnapShot(){
 }
 
  function getProcessList(){
-    try {
-execSync('tasklist', { encoding: 'utf8' })
+    try { 
+    // const out = execSync('ps aux --no-headers', { encoding: 'utf8' })
+    const out = execSync('tasklist', { encoding: 'utf8' })
     return out
       .split('\n')
       .filter(line => line.match(/node|go|python|next|vite|webpack/i))

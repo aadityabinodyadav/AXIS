@@ -10,6 +10,10 @@ export class AgentRegistry {
         this._startMonitor()
     }
 
+    get(agentId) {
+  return this.agents.get(agentId);
+}
+
     register(agentId, ws) {
         const existing = this.agents.get(agentId)
         if (existing) {
@@ -20,7 +24,7 @@ export class AgentRegistry {
             id: agentId,
             ws,
             status: AgentStatus.CONNECTED,
-            CONNECTED: new Date(),
+            connectedAt: new Date(),
             lastHeartbeat: new Date(),
             lastSnapshot: null
         }
