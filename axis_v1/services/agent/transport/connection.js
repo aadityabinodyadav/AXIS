@@ -5,9 +5,9 @@
  * The agent never gives up connecting — it just waits longer.
  */
 
-import WebSocket, { OPEN } from 'ws'
-import { createLogger } from '../../../packages/logger/src'
-import { buildMessage, MessageType } from '../../../packages/protocol/messages'
+import WebSocket from 'ws'
+import { createLogger } from '../../../packages/logger/src/index.js'
+import { buildMessage, MessageType } from '../../../packages/protocol/messages.js'
 
 const log = createLogger('agent:transport')
 
@@ -82,7 +82,7 @@ export class AgentConnection {
    * Send a typed message to coordinator.
    */
   send(type, payload = {}) {
-    if (!this.connected || this.ws.readyState !== OPEN) {
+    if (!this.connected || this.ws.readyState !== 1) {
       log.warn({ type }, 'attempted send while disconnected — dropped')
       return false
     }

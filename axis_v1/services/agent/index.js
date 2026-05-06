@@ -1,8 +1,8 @@
-import { getConfig } from "../../packages/config/src";
-import { createLogger } from "../../packages/logger/src";
-import { MessageType } from "../../packages/protocol/messages";
-import { getSnapShot } from "./observer/system";
-import { AgentConnection } from "./transport/connection";
+import { getConfig } from "../../packages/config/src/index.js";
+import { createLogger } from "../../packages/logger/src/index.js";
+import { MessageType } from "../../packages/protocol/messages.js";
+import { getSnapShot } from "./observer/system.js";
+import { AgentConnection } from "./transport/connection.js";
 
 const log = createLogger('agent')
 const config = getConfig()
@@ -32,7 +32,7 @@ conn.on(MessageType.COMMAND,(msg)=>{
 
 setInterval(()=>{
     if(!conn.connected) return
-    const snapshot = new getSnapShot()
+    const snapshot = getSnapShot()
     conn.send(MessageType.SYSTEM_STATE, snapshot)
     log.debug('system state sent')
 },30_000)

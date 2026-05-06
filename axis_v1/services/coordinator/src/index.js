@@ -1,10 +1,11 @@
-import { getConfig } from "../../../packages/config/src";
-import { createLogger } from "../../../packages/logger/src";
+import { getConfig } from "../../../packages/config/src/index.js";
+import { createLogger } from "../../../packages/logger/src/index.js";
+
 import http, { WebSocket } from 'http';
 import express, { raw } from "express"
-import { AgentRegistry } from "./agent/registry";
+import { AgentRegistry } from "./agent/registry.js";
 import { WebSocketServer } from "ws";
-import { MessageType, validateMessage } from "../../../packages/protocol/messages";
+import { MessageType, validateMessage } from "../../../packages/protocol/messages.js";
 
 const log = createLogger('coordinator')
 const config = getConfig();
@@ -38,7 +39,7 @@ app.get('/state', (req,res) =>{
 const server = http.createServer(app);
 const wss = new WebSocketServer({server})
 
-wss.on('connection', (ws,res)=>{
+wss.on('connection', (ws,req)=>{
     const url = new URL(req.url, 'http://localhost')
     const agentId = url.searchParams.get('agentId');
     const secret = url.searchParams.get('secret');
@@ -56,8 +57,8 @@ wss.on('connection', (ws,res)=>{
 
     const agent = registry.register(agentId, ws)
 
-    ws.on('message'), (raw) => {
-        msg = JSON.parse(raw)
+    ws.on('message', (raw) => {
+        const msg = JSON.parse(raw)
         const {valid, reason} = validateMessage(msg)
 
         if(!valid){
@@ -71,7 +72,7 @@ wss.on('connection', (ws,res)=>{
                 break
             
             case MessageType.SYSTEM_STATE:
-                registry.updateSnapshot(agent, msg.payload)
+                registry.updateSnapshot(agentId, msg.payload)
                 break
 
             case MessageType.PROBE_ACK:
@@ -92,7 +93,7 @@ wss.on('connection', (ws,res)=>{
         log.warn({ type: msg.type }, 'unhandled message type')
     }
 
-        }
+        })
     
    ws.on('close', () => {
     registry.deregister(agentId)

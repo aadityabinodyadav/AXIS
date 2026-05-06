@@ -1,6 +1,7 @@
 import express from "express"
 import http from "http"
-import { getConfig } from "../../../packages/config/src"
+import { getConfig } from "../../../packages/config/src/index.js"
+import { createLogger } from "../../../packages/logger/src/index.js";
 
 const log = createLogger('gateway');
 const config = getConfig();
@@ -30,20 +31,22 @@ app.get('/health', async (req,res)=>{
     })
 })
 
-app.get('/v1/state', async (req,rest)=>{
+app.get('/v1/state', async (req,res)=>{
     try {
         const response = await fetch(`http://localhost:${config.coordinator.port}/state`)
         const data = await response.json()
+
+        res.status(response.status).json(data)
     } catch (error) {
-        log.error({ err: err.message }, 'coordinator unreachable')
-    res.status(503).json({
-      ok: false,
-      error: {
-        code:      'COORDINATOR_UNREACHABLE',
-        message:   'coordinator is not responding',
-        retryable: true,
-      }
-    })
+        log.error({ err: error.message }, 'coordinator unreachable')
+        res.status(503).json({
+            ok: false,
+            error: {
+                code: 'COORDINATOR_UNREACHABLE',
+                message: 'coordinator is not responding',
+                retryable: true,
+            },
+        })
     }
 })
 

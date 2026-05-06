@@ -12,7 +12,9 @@
     "coordinator": "node services/coordinator/src/index.js",
     "gateway": "node services/gateway/src/index.js"
   },
+  "type": "module",
   "dependencies": {
+    "@axis/config": "^1.0.0",
     "express": "^5.2.1",
     "ws": "^8.20.0"
   }

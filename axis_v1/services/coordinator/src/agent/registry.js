@@ -1,5 +1,5 @@
-import { createLogger } from "../../../../packages/logger/src";
-import { AgentStatus } from "../../../../packages/protocol/messages";
+import { createLogger } from "../../../../packages/logger/src/index.js";
+import { AgentStatus } from "../../../../packages/protocol/messages.js";
 
 const log = createLogger('coordinator: registry')
 
@@ -32,9 +32,9 @@ export class AgentRegistry {
     }
 
     heartbeat(agentId) {
-        const agent = this.agent.get(agentId);
+        const agent = this.agents.get(agentId);
 
-        if (!agentId) return
+        if (!agent) return
 
         agent.lastHeartbeat = new Date()
 
@@ -45,7 +45,7 @@ export class AgentRegistry {
     }
 
     updateSnapshot(agentId, snapshot) {
-        const agent = this.agents.set(agentId)
+        const agent = this.agents.get(agentId)
         if (!agent) return
         agent.lastSnapshot = snapshot
     }
