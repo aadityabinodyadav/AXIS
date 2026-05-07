@@ -2,11 +2,12 @@ import Database from 'better-sqlite3'
 import { createLogger } from '../../../packages/logger/src/index.js'
 import { getConfig } from '../../../packages/config/src/index.js'
 import fs from "fs"
+import path from 'path'
 
 const log = createLogger('brain:db')
 const config = getConfig()
 
-const DB_PATH = Path2D.join(config.db.dir, 'brain.db')
+const DB_PATH = path.join(config.db.dir, 'brain.db')
 
 let db
 

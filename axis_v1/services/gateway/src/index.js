@@ -140,6 +140,49 @@ app.get("/v1/commands/:id", requireAuth, async (req, res) => {
   }
 });
 
+
+app.post('/v1/chat', requireAuth, async (req,res)=>{
+  const {message, sessionId} = req.body
+
+  if(!message){
+    return res.status(400).json({
+      ok: false,
+      error: { code: 'MISSING_MESSAGE' }
+    })
+  }
+
+  try {
+    const r = await fetch(
+        `http://localhost:${process.env.BRAIN_PORT || 3002}/chat`,
+        {
+          method: 'POST',
+          headers:{
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({message, sessionId})  
+        }
+    )
+
+    const data = await r.json()
+    res.json(data)
+  } catch (error) {
+    res.status(503).json({
+      ok: false,
+      error: {code: 'BRAIN_UNREACHABLE', retryable: true}
+    })
+  }
+})
+
+app.get('/v1/memory/core', requireAuth, async (req, res) => {
+  try {
+    const r    = await fetch(`http://localhost:${process.env.BRAIN_PORT || 3002}/memory/core`)
+    const data = await r.json()
+    res.json(data)
+  } catch {
+    res.status(503).json({ ok: false, error: { code: 'BRAIN_UNREACHABLE' } })
+  }
+})
+
 const server = http.createServer(app);
 
 server.listen(config.gateway.port, () => {

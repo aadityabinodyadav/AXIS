@@ -69,5 +69,5 @@ async function _closeSession(sessionId){
             new Date().toISOString()
         )
       active.delete(sessionId)
-      process.emit('session: closed', session)  
+    process.emit('session:closed', session)
 }

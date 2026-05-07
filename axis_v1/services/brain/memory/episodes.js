@@ -22,5 +22,5 @@ export function getRecent(limit = 8){
         FROM episodes
         ORDER BY created_at DESC
         LIMIT ?
-        `).limit(8)
+    `).all(limit)
 }
