@@ -5,11 +5,14 @@ import { getDb } from "../db.js";
 const log = createLogger('scout:dedup')
 
 function hashJob(job){
-    const key = `${job.company.toLowerCase().trim()}-${job.title.toLowerCase().trim()}`
+    const key = job.url
+        ? `${job.source || 'unknown'}-${job.url.toLowerCase().trim()}`
+        : `${job.company.toLowerCase().trim()}-${job.title.toLowerCase().trim()}-${job.location?.toLowerCase().trim() || ''}-${job.posted_at || ''}`
     return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16)
 }
 
-export function filterSeen(jobs){
+export function filterSeen(jobs, options = {}){
+    const { forceRefresh = false } = options
     const db = getDb()
     const now  = new Date().toISOString()
     const cutoff = new Date(Date.now() - 30 *24 *60 *60* 1000).toISOString()
@@ -26,6 +29,12 @@ export function filterSeen(jobs){
     const fresh = []
 
     for (const job of jobs){
+        if (forceRefresh) {
+            fresh.push(job)
+            insert.run(hashJob(job), job.source, now)
+            continue
+        }
+
         const hash = hashJob(job)
         const seen = check.get(hash, cutoff)
 

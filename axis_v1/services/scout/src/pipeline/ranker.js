@@ -7,8 +7,8 @@ const OPENROUTER_URL =
 
 
 const MODEL =
-  'google/gemma-4-26b-a4b-it:free'
-
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'
+  
 const BATCH_SIZE = 10
 
 const PROFILE = `
@@ -87,12 +87,25 @@ export async function rankJobs(jobs) {
         },
         'ranking batch failed'
       )
+
+      allRanked.push(...heuristicRank(batch))
     }
   }
 
-  return allRanked.sort(
+  const sorted = allRanked.sort(
     (a, b) => b.overall_score - a.overall_score
   )
+
+  if (sorted.length) {
+    return sorted
+  }
+
+  log.warn(
+    { count: jobs.length },
+    'AI ranker returned no usable jobs; using heuristic fallback'
+  )
+
+  return heuristicRank(jobs)
 }
 
 async function rankBatch(jobs) {
@@ -249,10 +262,10 @@ ${jobList}
       'failed parsing AI ranking JSON'
     )
 
-    return []
+    return heuristicRank(jobs)
   }
 
-  return ratings.map(r => ({
+  const ranked = ratings.map(r => ({
 
     ...jobs[r.idx],
 
@@ -274,5 +287,99 @@ ${jobList}
     blurb:
       r.blurb || 'No analysis generated.'
   }))
+
+  return ranked.sort((a, b) => b.overall_score - a.overall_score)
+}
+
+function heuristicRank(jobs) {
+  return jobs
+    .map(job => {
+      const text = `${job.title || ''} ${job.company || ''} ${job.location || ''} ${job.description || ''}`.toLowerCase()
+
+      const stack_match = scoreTerms(text, [
+        ['backend', 2],
+        ['go', 2],
+        ['golang', 2],
+        ['node', 2],
+        ['typescript', 1.5],
+        ['javascript', 1],
+        ['api', 1],
+        ['microservice', 1],
+        ['distributed', 1.5],
+        ['systems', 1.5],
+        ['platform', 1],
+        ['infrastructure', 1.5],
+      ])
+
+      const growth_signal = scoreTerms(text, [
+        ['fintech', 2],
+        ['payments', 1.5],
+        ['security', 1],
+        ['scalable', 1],
+        ['distributed', 1],
+        ['developer tools', 1],
+        ['infra', 1],
+      ])
+
+      const company_quality = scoreTerms(text, [
+        ['stripe', 2],
+        ['wise', 2],
+        ['revolut', 2],
+        ['checkout.com', 2],
+        ['primer', 2],
+        ['automattic', 2],
+        ['canonical', 1.5],
+        ['gitlab', 1.5],
+        ['remote', 0.5],
+      ])
+
+      const urgency = scoreTerms(text, [
+        ['hiring', 1.5],
+        ['immediate', 1.5],
+        ['urgent', 1.5],
+        ['open role', 1],
+        ['apply', 0.5],
+      ])
+
+      const overall_score = roundOne(
+        stack_match * 0.35 +
+        growth_signal * 0.30 +
+        company_quality * 0.20 +
+        urgency * 0.15
+      )
+
+      return {
+        ...job,
+        stack_match: roundOne(stack_match),
+        growth_signal: roundOne(growth_signal),
+        company_quality: roundOne(company_quality),
+        urgency: roundOne(urgency),
+        overall_score,
+        blurb: job.blurb || heuristicBlurb(job, overall_score),
+      }
+    })
+    .sort((a, b) => b.overall_score - a.overall_score)
+}
+
+function scoreTerms(text, terms) {
+  let score = 0
+
+  for (const [term, weight] of terms) {
+    if (text.includes(term)) {
+      score += weight
+    }
+  }
+
+  return Math.min(10, score)
+}
+
+function roundOne(value) {
+  return Math.round(value * 10) / 10
+}
+
+function heuristicBlurb(job, score) {
+  if (score >= 8) return 'Strong match for backend/infrastructure focus.'
+  if (score >= 6) return 'Good fit with relevant stack and domain signals.'
+  return 'Partial match; worth a quick review.'
 }
 

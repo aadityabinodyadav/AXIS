@@ -21,7 +21,7 @@ async function scrape() {
 
   const instance = await findWorkingInstance()
   if (!instance) {
-    log.warn('no working nitter instance — skipping')
+    log.info('no working nitter instance available — skipping')
     return []
   }
 
@@ -60,7 +60,7 @@ async function scrape() {
 async function findWorkingInstance() {
   for (const instance of NITTER_INSTANCES) {
     try {
-      const r = await fetch(`${instance}/x`, {
+      const r = await fetch(`${instance}/search?q=test&f=tweets`, {
         signal: AbortSignal.timeout(5_000)
       })
       if (r.ok) return instance

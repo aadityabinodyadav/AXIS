@@ -96,6 +96,38 @@ app.get('/jobs', (req, res) => {
     })
 })
 
+app.get('/jobs/saved', (req, res) => {
+
+        const limit = parseInt(req.query.limit || '50')
+        const offset = parseInt(req.query.offset || '0')
+
+        const db = getDb()
+
+        const savedJobs = db.prepare(`
+            SELECT
+                sj.job_id,
+                sj.saved_at,
+                sj.notes,
+                j.*
+            FROM saved_jobs sj
+            LEFT JOIN jobs j ON j.id = sj.job_id
+            ORDER BY sj.saved_at DESC
+            LIMIT ?
+            OFFSET ?
+        `).all(limit, offset)
+
+        return res.json({
+                ok: true,
+                data: {
+                        jobs: savedJobs,
+                        limit,
+                        offset,
+                        total: savedJobs.length,
+                },
+                error: null
+        })
+})
+
 app.post('/jobs/:id/save', (req, res) => {
 
     const { id } = req.params
@@ -133,8 +165,12 @@ app.post('/run', async (req, res) => {
         'manual scout pipeline trigger'
     )
 
+    const forceRefresh = String(req.query.refresh || req.body?.refresh || '').toLowerCase() === 'true' ||
+        req.query.refresh === '1' ||
+        req.body?.refresh === true
+
     // fire and forget
-    runPipeline()
+    runPipeline({ forceRefresh })
         .catch(err => {
 
             log.error(

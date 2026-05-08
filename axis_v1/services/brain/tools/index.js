@@ -59,7 +59,7 @@ export const TOOL_DEFINITIONS = [
         type: 'function',
         function: {
             name: 'scout_search',
-            description: 'Search for jobs on demand. Use when user asks about jobs, opportunities, companies hiring, or career signals. Triggers Scout pipeline for specific queries.',
+            description: 'Search for jobs on demand. Use when user asks about jobs, opportunities, companies hiring, or career signals. Triggers a fresh Scout pipeline run and returns matching jobs.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -84,6 +84,26 @@ export const TOOL_DEFINITIONS = [
             parameters: {
                 type: 'object',
                 properties: {},
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'scout_saved_jobs',
+            description: 'List jobs the user has saved/bookmarked in Scout. Use when the user asks what roles have been saved.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    limit: {
+                        type: 'number',
+                        description: 'Maximum number of saved jobs to return. Default 50.',
+                    },
+                    offset: {
+                        type: 'number',
+                        description: 'Pagination offset. Default 0.',
+                    },
+                },
             },
         },
     },
@@ -133,16 +153,58 @@ export async function executeTool(toolName, args, coordinatorPort) {
             case 'scout_search': {
                 const scoutPort = process.env.SCOUT_PORT || 3003
                 const minScore = args.minScore || 6
+                await fetch(`http://localhost:${scoutPort}/run?refresh=1`, { method: 'POST' })
+                await new Promise(resolve => setTimeout(resolve, 7000))
+
                 const r = await fetch(
-                    `http://localhost:${scoutPort}/jobs?min_score=${minScore}&limit=10`
+                    `http://localhost:${scoutPort}/jobs?min_score=0&limit=50`
                 )
-                result = await r.json()
+                const data = await r.json()
+                const query = `${args.query || ''}`.toLowerCase().trim()
+                const terms = query.split(/\s+/).filter(Boolean)
+
+                const rankedJobs = data?.data?.jobs || []
+                const scoredJobs = rankedJobs.filter(job => (job.overall_score || 0) >= minScore)
+
+                let jobs = scoredJobs.filter(job => {
+                    if (!terms.length) return true
+
+                    const text = `${job.title || ''} ${job.company || ''} ${job.location || ''} ${job.description || ''}`.toLowerCase()
+                    return terms.some(term => text.includes(term))
+                })
+
+                if (!jobs.length) {
+                    jobs = scoredJobs.slice(0, 10)
+                }
+
+                if (!jobs.length) {
+                    jobs = rankedJobs.slice(0, 10)
+                }
+
+                result = {
+                    ok: true,
+                    data: {
+                        query: args.query || '',
+                        minScore,
+                        jobs,
+                        total: jobs.length,
+                    },
+                }
                 break
             }
 
             case 'scout_digest': {
                 const scoutPort = process.env.SCOUT_PORT || 3003
                 const r = await fetch(`http://localhost:${scoutPort}/digest/latest`)
+                result = await r.json()
+                break
+            }
+
+            case 'scout_saved_jobs': {
+                const scoutPort = process.env.SCOUT_PORT || 3003
+                const limit = args.limit || 50
+                const offset = args.offset || 0
+                const r = await fetch(`http://localhost:${scoutPort}/jobs/saved?limit=${limit}&offset=${offset}`)
                 result = await r.json()
                 break
             }

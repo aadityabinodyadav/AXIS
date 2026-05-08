@@ -23,27 +23,47 @@ const RELEVANT_SIGNALS = [
     /\bsystems?\s+engineer/i,
 ]
 
-const MIN_RELEVANT_SIGNALS = 1
+const MIN_RELEVANT_SIGNALS = 0
 
 export function preFilter(jobs) {
     const passed = []
+    const stats = {
+        stale: 0,
+        blocklisted: 0,
+        lowSignal: 0,
+    }
     const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
 
     for (const job of jobs) {
         const text = `${job.title} ${job.description}`.toLowerCase()
 
-        if (job.posted_at && new Date(job.posted_at) < cutoff) continue
+        if (job.posted_at && new Date(job.posted_at) < cutoff) {
+            stats.stale += 1
+            continue
+        }
 
-        if (BLOCKLIST.some(pattern => pattern.test(text))) continue
+        if (BLOCKLIST.some(pattern => pattern.test(text))) {
+            stats.blocklisted += 1
+            continue
+        }
 
         const signals = RELEVANT_SIGNALS.filter(s => s.test(text)).length
 
-        if (signals < MIN_RELEVANT_SIGNALS) continue
+        if (signals < MIN_RELEVANT_SIGNALS) {
+            stats.lowSignal += 1
+            continue
+        }
 
         passed.push(job)
 
     }
 
-    log.info({ input: jobs.length, passed: passed.length }, 'pre-filter complete')
+    log.info({
+        input: jobs.length,
+        passed: passed.length,
+        stale: stats.stale,
+        blocklisted: stats.blocklisted,
+        lowSignal: stats.lowSignal,
+    }, 'pre-filter complete')
     return passed
 }

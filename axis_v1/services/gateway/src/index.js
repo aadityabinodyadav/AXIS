@@ -220,7 +220,14 @@ server.listen(config.gateway.port, () => {
 });
 
 
-process.on("SIGINT", () => {
+function registerExitHandler(name, handler) {
+  process._registeredExitHandlers = process._registeredExitHandlers || new Set()
+  if (process._registeredExitHandlers.has(name)) return
+  process._registeredExitHandlers.add(name)
+  process.on('SIGINT', handler)
+}
+
+registerExitHandler('gateway', () => {
   log.info("shutting down gateway");
   process.exit(0);
 });

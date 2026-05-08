@@ -6,6 +6,8 @@ import { scrape } from '../scrapers/remotive.js'
 import { scrape as _scrape } from '../scrapers/wellfound.js'
 import { scrape as __scrape } from '../scrapers/github.js'
 import { scrape as ___scrape } from '../scrapers/nitter.js'
+import { scrape as remoteokScrape } from '../scrapers/remoteok.js'
+import { scrape as wwrScrape } from '../scrapers/weworkremotely.js'
 import { filterSeen } from '../pipeline/dedup.js'
 import { preFilter } from '../pipeline/filter.js'
 import { rankJobs } from '../pipeline/ranker.js'
@@ -15,7 +17,8 @@ const log = createLogger('scout:scheduler')
 
 let isRunning = false
 
-async function runPipeline() {
+async function runPipeline(options = {}) {
+  const { forceRefresh = false } = options
   if (isRunning) {
     log.warn('pipeline already running — skipping')
     return null
@@ -27,12 +30,14 @@ async function runPipeline() {
 
   try {
     log.info('scraping sources')
-    const [remotiveJobs, wellfoundJobs, githubJobs, nitterJobs] =
+    const [remotiveJobs, wellfoundJobs, githubJobs, nitterJobs, remoteokJobs, wwrJobs] =
       await Promise.allSettled([
         scrape(),
         _scrape(),
         __scrape(),
         ___scrape(),
+        remoteokScrape(),
+        wwrScrape(),
       ])
 
     const raw = [
@@ -40,11 +45,13 @@ async function runPipeline() {
       ...(wellfoundJobs.status === 'fulfilled' ? wellfoundJobs.value : []),
       ...(githubJobs.status    === 'fulfilled' ? githubJobs.value    : []),
       ...(nitterJobs.status    === 'fulfilled' ? nitterJobs.value    : []),
+      ...(remoteokJobs.status  === 'fulfilled' ? remoteokJobs.value  : []),
+      ...(wwrJobs.status       === 'fulfilled' ? wwrJobs.value       : []),
     ]
 
     log.info({ total: raw.length }, 'scraping complete')
 
-    const fresh = filterSeen(raw)
+    const fresh = filterSeen(raw, { forceRefresh })
 
     const filtered = preFilter(fresh)
 

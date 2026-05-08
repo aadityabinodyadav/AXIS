@@ -14,7 +14,14 @@ start()
 
 import './api/index.js'
 
-process.on('SIGINT', () => {
+function registerExitHandler(name, handler) {
+  process._registeredExitHandlers = process._registeredExitHandlers || new Set()
+  if (process._registeredExitHandlers.has(name)) return
+  process._registeredExitHandlers.add(name)
+  process.on('SIGINT', handler)
+}
+
+registerExitHandler('scout', () => {
   log.info('shutting down scout')
   process.exit(0)
 })

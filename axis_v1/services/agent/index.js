@@ -57,9 +57,16 @@ setInterval(()=>{
 
 conn.connect()
 
-process.on('SIGINT',()=>{
-    log.info('shutting down agent')
-    process.exit(0)
+function registerExitHandler(name, handler) {
+    process._registeredExitHandlers = process._registeredExitHandlers || new Set()
+    if (process._registeredExitHandlers.has(name)) return
+    process._registeredExitHandlers.add(name)
+    process.on('SIGINT', handler)
+}
+
+registerExitHandler('agent', ()=>{
+        log.info('shutting down agent')
+        process.exit(0)
 })
 
 

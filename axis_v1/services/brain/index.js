@@ -107,9 +107,16 @@ const server = app.listen(PORT, ()=>{
     )
 })
 
-process.on('SIGINT', ()=>{
-    log.info('shutting down brain')
-    server.close(()=>{
-        process.exit(0)
-    })
+function registerExitHandler(name, handler) {
+  process._registeredExitHandlers = process._registeredExitHandlers || new Set()
+  if (process._registeredExitHandlers.has(name)) return
+  process._registeredExitHandlers.add(name)
+  process.on('SIGINT', handler)
+}
+
+registerExitHandler('brain', ()=>{
+  log.info('shutting down brain')
+  server.close(()=>{
+    process.exit(0)
+  })
 })
