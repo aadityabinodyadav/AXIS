@@ -183,6 +183,36 @@ app.get('/v1/memory/core', requireAuth, async (req, res) => {
   }
 })
 
+app.get('/v1/digest/latest', requireAuth, async (req, res) => {
+  try {
+    const r    = await fetch(`http://localhost:${process.env.SCOUT_PORT || 3003}/digest/latest`)
+    const data = await r.json()
+    res.json(data)
+  } catch {
+    res.status(503).json({ ok: false, error: { code: 'SCOUT_UNREACHABLE' } })
+  }
+})
+
+app.get('/v1/jobs', requireAuth, async (req, res) => {
+  try {
+    const r    = await fetch(`http://localhost:${process.env.SCOUT_PORT || 3003}/jobs${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`)
+    const data = await r.json()
+    res.json(data)
+  } catch {
+    res.status(503).json({ ok: false, error: { code: 'SCOUT_UNREACHABLE' } })
+  }
+})
+
+app.post('/v1/scout/run', requireAuth, async (req, res) => {
+  try {
+    const r    = await fetch(`http://localhost:${process.env.SCOUT_PORT || 3003}/run`, { method: 'POST' })
+    const data = await r.json()
+    res.json(data)
+  } catch {
+    res.status(503).json({ ok: false, error: { code: 'SCOUT_UNREACHABLE' } })
+  }
+})
+
 const server = http.createServer(app);
 
 server.listen(config.gateway.port, () => {

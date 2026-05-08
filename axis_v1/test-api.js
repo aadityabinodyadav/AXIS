@@ -1,5 +1,5 @@
 (async () => {
-// const key = //your key;
+//const key = //your key;
 const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
   method: 'POST',
   headers: {

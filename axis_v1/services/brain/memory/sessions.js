@@ -58,16 +58,26 @@ async function _closeSession(sessionId){
 
     log.info({sessionId}, 'session closing - summarizing')
 
+    if(session._timer){
+        clearTimeout(session._timer)
+        session._timer = null
+    }
+
+    active.delete(sessionId)
+
     const db = getDb()
     db.prepare(`
         INSERT INTO sessions (id, messages, started_at, closed_at)
         VALUES(?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          messages = excluded.messages,
+          started_at = excluded.started_at,
+          closed_at = excluded.closed_at
         `).run(
             session.id,
             JSON.stringify(session.messages),
             session.startedAt,
             new Date().toISOString()
         )
-      active.delete(sessionId)
     process.emit('session:closed', session)
 }

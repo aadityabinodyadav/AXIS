@@ -54,6 +54,40 @@ export const TOOL_DEFINITIONS = [
             },
         },
     },
+
+    {
+        type: 'function',
+        function: {
+            name: 'scout_search',
+            description: 'Search for jobs on demand. Use when user asks about jobs, opportunities, companies hiring, or career signals. Triggers Scout pipeline for specific queries.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: {
+                        type: 'string',
+                        description: 'What to search for e.g. "backend Go roles fintech Europe"',
+                    },
+                    minScore: {
+                        type: 'number',
+                        description: 'Minimum relevance score 1-10. Default 6.',
+                    },
+                },
+                required: ['query'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'scout_digest',
+            description: 'Get today\'s job digest — the pre-ranked morning brief. Use when user asks what jobs are available today or wants the daily summary.',
+            parameters: {
+                type: 'object',
+                properties: {},
+            },
+        },
+    },
+
 ]
 
 export async function executeTool(toolName, args, coordinatorPort) {
@@ -92,6 +126,24 @@ export async function executeTool(toolName, args, coordinatorPort) {
             case 'update_memory': {
                 set(args.key, args.value)
                 result = { ok: true, message: `remembered: ${args.key} = ${args.value}` }
+                break
+            }
+
+
+            case 'scout_search': {
+                const scoutPort = process.env.SCOUT_PORT || 3003
+                const minScore = args.minScore || 6
+                const r = await fetch(
+                    `http://localhost:${scoutPort}/jobs?min_score=${minScore}&limit=10`
+                )
+                result = await r.json()
+                break
+            }
+
+            case 'scout_digest': {
+                const scoutPort = process.env.SCOUT_PORT || 3003
+                const r = await fetch(`http://localhost:${scoutPort}/digest/latest`)
+                result = await r.json()
                 break
             }
 
