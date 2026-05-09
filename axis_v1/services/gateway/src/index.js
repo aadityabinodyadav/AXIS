@@ -1,5 +1,7 @@
 import express from "express";
 import http from "http";
+import { WebSocketServer } from 'ws'
+import jwt from 'jsonwebtoken'
 import { getConfig } from "../../../packages/config/src/index.js";
 import { createLogger } from "../../../packages/logger/src/index.js";
 import { generateToken, requireAuth } from "./middleware/auth.js";
@@ -9,6 +11,16 @@ const config = getConfig();
 
 const app = express();
 app.use(express.json());
+
+// Simple CORS middleware for development (allows Expo web/dev host).
+app.use((req, res, next) => {
+  // Allow all origins in dev for convenience; tighten in production.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 
 app.use((req, res, next) => {
@@ -214,6 +226,28 @@ app.post('/v1/scout/run', requireAuth, async (req, res) => {
 })
 
 const server = http.createServer(app);
+
+try{
+  const wss = new WebSocketServer({ server, path: '/v1/stream' })
+
+  wss.on('connection', (ws, req) => {
+    const url = new URL(req.url, `http://${req.headers.host}`)
+    const token = url.searchParams.get('token')
+    if (!token) return ws.close(4001, 'missing token')
+
+    try {
+      const payload = jwt.verify(token, config.gateway.jwtSecret)
+      ws.user = payload
+      ws.send(JSON.stringify({ type: 'connected', payload: { user: payload } }))
+    } catch (err) {
+      return ws.close(4001, 'unauthorized')
+    }
+
+    ws.on('message', () => {})
+  })
+} catch (err) {
+  // ignore if ws cannot be attached in some environments
+}
 
 server.listen(config.gateway.port, () => {
   log.info({ port: config.gateway.port }, "gateway listening");
