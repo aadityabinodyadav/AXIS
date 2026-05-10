@@ -227,26 +227,167 @@ app.post('/v1/scout/run', requireAuth, async (req, res) => {
 
 const server = http.createServer(app);
 
-try{
-  const wss = new WebSocketServer({ server, path: '/v1/stream' })
-
-  wss.on('connection', (ws, req) => {
-    const url = new URL(req.url, `http://${req.headers.host}`)
-    const token = url.searchParams.get('token')
-    if (!token) return ws.close(4001, 'missing token')
-
-    try {
-      const payload = jwt.verify(token, config.gateway.jwtSecret)
-      ws.user = payload
-      ws.send(JSON.stringify({ type: 'connected', payload: { user: payload } }))
-    } catch (err) {
-      return ws.close(4001, 'unauthorized')
-    }
-
-    ws.on('message', () => {})
+try {
+  const wss = new WebSocketServer({
+    server,
+    path: '/v1/stream'
   })
+
+  wss.on('connection', (ws) => {
+    let authed = false
+    let authTimer = null
+
+    // Simple per-connection rate limiting
+    let lastMsg = 0
+
+    /**
+     * Force auth within 5 seconds
+     */
+    authTimer = setTimeout(() => {
+      if (!authed) {
+        ws.close(4001, 'auth timeout')
+      }
+    }, 5000)
+
+    ws.on('message', (raw) => {
+
+      /**
+       * Rate limit:
+       * max ~20 msgs/sec per connection
+       */
+      const now = Date.now()
+
+      if (now - lastMsg < 50) {
+        return
+      }
+
+      lastMsg = now
+
+      try {
+        const msg = JSON.parse(raw.toString())
+
+        /**
+         * AUTH HANDSHAKE
+         */
+        if (msg.type === 'AUTH') {
+          try {
+            const payload = jwt.verify(
+              msg.payload?.token,
+              config.gateway.jwtSecret
+            )
+
+            ws.user = payload
+            authed = true
+
+            clearTimeout(authTimer)
+
+            ws.send(JSON.stringify({
+              type: 'AUTH_OK',
+              payload: {
+                user: payload
+              }
+            }))
+
+            log.info(
+              {
+                user: payload.sub || payload.id || 'unknown'
+              },
+              'ws client authenticated'
+            )
+
+          } catch (err) {
+
+            ws.send(JSON.stringify({
+              type: 'AUTH_FAIL'
+            }))
+
+            return ws.close(4001, 'invalid token')
+          }
+
+          return
+        }
+
+        /**
+         * Reject everything before auth
+         */
+        if (!authed) {
+          return ws.close(4001, 'unauthorized')
+        }
+
+        /**
+         * AUTHENTICATED MESSAGE HANDLING
+         */
+
+        switch (msg.type) {
+
+          case 'PING': {
+            ws.send(JSON.stringify({
+              type: 'PONG',
+              ts: Date.now()
+            }))
+            break
+          }
+
+          case 'SUBSCRIBE_LOGS': {
+            ws.send(JSON.stringify({
+              type: 'SUBSCRIBED',
+              channel: 'logs'
+            }))
+            break
+          }
+
+          default: {
+            ws.send(JSON.stringify({
+              type: 'ERROR',
+              error: {
+                code: 'UNKNOWN_MESSAGE_TYPE'
+              }
+            }))
+          }
+        }
+
+      } catch (err) {
+
+        ws.send(JSON.stringify({
+          type: 'ERROR',
+          error: {
+            code: 'INVALID_MESSAGE'
+          }
+        }))
+      }
+    })
+
+    ws.on('close', () => {
+      clearTimeout(authTimer)
+
+      log.info(
+        {
+          user: ws.user?.sub || ws.user?.id || 'unknown'
+        },
+        'ws client disconnected'
+      )
+    })
+
+    ws.on('error', (err) => {
+      log.error(
+        {
+          err: err.message
+        },
+        'ws error'
+      )
+    })
+  })
+
+  log.info('websocket stream initialized')
+
 } catch (err) {
-  // ignore if ws cannot be attached in some environments
+
+  log.error(
+    {
+      err: err.message
+    },
+    'failed to initialize websocket server'
+  )
 }
 
 server.listen(config.gateway.port, () => {

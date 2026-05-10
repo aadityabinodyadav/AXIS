@@ -1,39 +1,25 @@
-import React, { useEffect }   from 'react'
+import React, { useEffect, useCallback } from 'react'
 import { View, ScrollView, TouchableOpacity,
          StyleSheet, Linking, RefreshControl } from 'react-native'
-import { useAxis } from '../store'
-import { Card }    from '../components/Card'
-import { Label }   from '../components/Label'
-import { theme }   from '../theme'
-
-const SCORE_COLOR = (score) => {
-  if (score >= 8) return theme.colors.accent
-  if (score >= 6) return theme.colors.warn
-  return theme.colors.textDim
-}
-
-const SCORE_LABEL = (score) => {
-  if (score >= 8) return '🔥'
-  if (score >= 6) return '⚡'
-  return '👀'
-}
+import { useScout }  from '../store/scout.store'
+import { Card }      from '../components/Card'
+import { Label }     from '../components/Label'
+import { scoreColor, scoreLabel } from '../utils/score'
+import { theme }     from '../theme'
 
 export function ScoutScreen({ navigation }) {
-  const { state, actions } = useAxis()
-  const { digest, digestLoading } = state
+  const { state, actions } = useScout()
+  const { digest, loading } = state
 
-  useEffect(() => {
-    actions.loadDigest()
-  }, [])
+  useEffect(() => { actions.loadDigest() }, [])
 
-  if (!digest && !digestLoading) {
+  const onRefresh = useCallback(() => actions.loadDigest(), [])
+
+  if (!digest && !loading) {
     return (
       <View style={s.empty}>
         <Label dim>No digest yet.</Label>
-        <TouchableOpacity
-          style={s.runBtn}
-          onPress={() => actions.post('/v1/scout/run')}
-        >
+        <TouchableOpacity style={s.runBtn} onPress={actions.runPipeline}>
           <Label accent>Run Scout Now</Label>
         </TouchableOpacity>
       </View>
@@ -45,36 +31,28 @@ export function ScoutScreen({ navigation }) {
       style={s.container}
       refreshControl={
         <RefreshControl
-          refreshing={digestLoading}
-          onRefresh={actions.loadDigest}
+          refreshing={loading}
+          onRefresh={onRefresh}
           tintColor={theme.colors.accent}
         />
       }
     >
-      {/* Header Stats */}
+      {/* Stats Header */}
       <Card style={{ marginTop: theme.space.md }}>
         <Label dim size={11} style={{ letterSpacing: 2, marginBottom: 8 }}>
           SCOUT DAILY BRIEF — {digest?.date}
         </Label>
         <View style={s.statsRow}>
-          <View style={s.stat}>
-            <Label size={24} style={{ fontWeight: '700' }}>
-              {digest?.total_processed || 0}
-            </Label>
-            <Label dim size={11}>scanned</Label>
-          </View>
-          <View style={s.stat}>
-            <Label size={24} style={{ fontWeight: '700', color: theme.colors.warn }}>
-              {digest?.total_filtered || 0}
-            </Label>
-            <Label dim size={11}>filtered</Label>
-          </View>
-          <View style={s.stat}>
-            <Label size={24} style={{ fontWeight: '700', color: theme.colors.accent }}>
-              {digest?.top_picks?.length || 0}
-            </Label>
-            <Label dim size={11}>worth it</Label>
-          </View>
+          {[
+            [digest?.total_processed || 0, 'scanned',  theme.colors.text],
+            [digest?.total_filtered   || 0, 'filtered', theme.colors.warn],
+            [digest?.top_picks?.length || 0, 'worth it', theme.colors.accent],
+          ].map(([val, label, color]) => (
+            <View key={label} style={s.stat}>
+              <Label size={24} style={{ fontWeight: '700', color }}>{val}</Label>
+              <Label dim size={11}>{label}</Label>
+            </View>
+          ))}
         </View>
       </Card>
 
@@ -98,7 +76,6 @@ export function ScoutScreen({ navigation }) {
         </>
       )}
 
-      {/* Ask Scout */}
       <TouchableOpacity
         style={s.chatBtn}
         onPress={() => navigation.navigate('Chat')}
@@ -121,8 +98,8 @@ function JobCard({ job, compact }) {
           {job.title}
         </Label>
         <Label size={compact ? 13 : 16}
-          style={{ color: SCORE_COLOR(job.overall_score), marginLeft: 8 }}>
-          {SCORE_LABEL(job.overall_score)} {job.overall_score?.toFixed(1)}
+          style={{ color: scoreColor(job.overall_score), marginLeft: 8 }}>
+          {scoreLabel(job.overall_score)} {job.overall_score?.toFixed(1)}
         </Label>
       </View>
 
@@ -151,6 +128,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.bg, padding: theme.space.md },
   empty:     { flex: 1, alignItems: 'center', justifyContent: 'center',
                backgroundColor: theme.colors.bg },
+  runBtn:    { marginTop: theme.space.md, padding: theme.space.md },
   statsRow:  { flexDirection: 'row', justifyContent: 'space-around' },
   stat:      { alignItems: 'center' },
   section:   { letterSpacing: 2, marginTop: theme.space.lg,
@@ -158,9 +136,8 @@ const s = StyleSheet.create({
   jobHeader: { flexDirection: 'row', alignItems: 'flex-start' },
   jobFooter: { flexDirection: 'row', justifyContent: 'space-between',
                alignItems: 'center', marginTop: theme.space.sm },
-  chatBtn:   { backgroundColor: theme.colors.accentDim,
-               borderWidth: 1, borderColor: theme.colors.accent,
-               borderRadius: theme.radius.md, padding: theme.space.md,
-               alignItems: 'center', marginTop: theme.space.md },
-  runBtn:    { marginTop: theme.space.md, padding: theme.space.md },
+  chatBtn:   { backgroundColor: theme.colors.accentDim, borderWidth: 1,
+               borderColor: theme.colors.accent, borderRadius: theme.radius.md,
+               padding: theme.space.md, alignItems: 'center',
+               marginTop: theme.space.md },
 })
