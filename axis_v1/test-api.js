@@ -8,7 +8,7 @@ const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     'HTTP-Referer': 'http://localhost:3000',
     'X-Title': 'AXIS'
   },
-  body: JSON.stringify({
+  body:  JSON.stringify({
     model: 'deepseek/deepseek-r1-0528',
     messages: [{role: 'user', content: 'hello'}],
     max_tokens: 100
